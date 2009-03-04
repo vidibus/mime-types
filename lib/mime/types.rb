@@ -596,6 +596,7 @@ module MIME
     def initialize(data_version = nil)
       @type_variants    = Hash.new { |h, k| h[k] = [] }
       @extension_index  = Hash.new { |h, k| h[k] = [] }
+      @data_version     = data_version
     end
 
     def add_type_variant(mime_type) #:nodoc:

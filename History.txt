@@ -1,3 +1,11 @@
+== MIME::Types 2.0
+* Actually plugged in the data_version for the MIME::Types list.
+* Added a build-time mechanism to export the data to separate files, mostly as
+  a tool to design the new data format, but it will also be an excellent tool
+  for being able to update the data moving forward.
+* PLANNED: Make it so that the data files are not "executable" code.
+* PLANNED: Move the import mechanism to a method or methods on the Types class.
+
 == MIME::Types 1.16
 * Made compatible with Ruby 1.8.6, 1.8.7, and 1.9.1.
 * Switched to the 'hoe' gem system and added a lot of build-time tools.

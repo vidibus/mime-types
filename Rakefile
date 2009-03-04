@@ -135,6 +135,28 @@ task :build_manifest do |t|
   puts paths
 end
 
+desc "Validate the RubyGem spec for GitHub."
+task :github_validate_spec do |t|
+  require 'yaml'
+
+  require 'rubygems/specification'
+  data = File.read("#{PKG_NAME}.gemspec")
+  spec = nil
+
+  if data !~ %r{!ruby/object:Gem::Specification}
+    code = "$SAFE = 3\n#{data}"
+    p code.split($/)[44]
+    Thread.new { spec = eval("$SAFE = 3\n#{data}") }.join
+  else
+    spec = YAML.load(data)
+  end
+
+  spec.validate
+
+  puts spec
+  puts "OK"
+end
+
 desc "Download the current MIME type registrations from IANA."
 task :iana, :save, :destination do |t, args|
   save_type = args.save || :text
@@ -293,24 +315,65 @@ http://www.iana.org/assignments/media-types/
   EOS
 end
 
-desc "Validate the RubyGem spec for GitHub."
-task :github_validate_spec do |t|
-  require 'yaml'
+desc "Exports the current MIME types to files."
+task :export_types, :destination do |t, args|
+  destination = args.destination || "type-lists"
 
-  require 'rubygems/specification'
-  data = File.read("#{PKG_NAME}.gemspec")
-  spec = nil
+  class << MIME::Types
+    def internal
+      @__types__
+    end
+  end
+  class MIME::Types
+    def variants
+      @type_variants
+    end
 
-  if data !~ %r{!ruby/object:Gem::Specification}
-    code = "$SAFE = 3\n#{data}"
-    p code.split($/)[44]
-    Thread.new { spec = eval("$SAFE = 3\n#{data}") }.join
-  else
-    spec = YAML.load(data)
+    def extensions
+      @extension_index
+    end
   end
 
-  spec.validate
+  internal = MIME::Types.internal
 
-  puts spec
-  puts "OK"
+  arr_hash = lambda { |h, k| h[k] = [] }
+
+  mime_types = Hash.new &arr_hash
+
+  internal.variants.keys.sort.each do |key|
+    internal.variants[key].each do |variant|
+      mime_types[variant.raw_media_type] << variant
+    end
+  end
+
+  ref = Hash.new &arr_hash
+  ext = Hash.new &arr_hash
+  enc = Hash.new &arr_hash
+  use = Hash.new &arr_hash
+  doc = Hash.new &arr_hash
+  url = Hash.new &arr_hash
+
+  mime_types.each do |media, types|
+    types.each do |type|
+      refline = [ type.content_type ]
+      refline << "OBSOLETE" if type.obsolete?
+      refline << "UNREGISTERED" unless type.registered?
+      refline << "REF:#{type.url.join(',')}" unless type.url.nil? or type.url.empty?
+      ref[media] << refline.join(" ")
+    end
+  end
+
+  require 'fileutils'
+  FileUtils.mkdir_p destination
+  Dir.chdir destination do
+    ref.each do |media, types|
+      File.open("#{media}.ref.text", "wb") do |f|
+        types.each do |type|
+          f.puts type
+        end
+      end
+    end
+  end
+
+# p mime_types.size, mime_types.keys.sort.map { |e| [e, mime_types[e].size] }
 end
